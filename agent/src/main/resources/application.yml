@@ -1,0 +1,26 @@
+server:
+  port: 8082
+spring:
+  ai:
+    openai:
+      api-key: sk-owasptirbudjigmrgplolrkzyxfznploljzrbnfrmdwzpqhj
+      base-url: https://api.siliconflow.cn
+      embedding:
+        options:
+          model: BAAI/bge-m3
+      chat:
+        options:
+          model: Qwen/Qwen2.5-7B-Instruct
+          timeout: 60000
+          max-retries: 3
+    vectorstore:
+      milvus:
+        client:
+          host: localhost
+          port: 19530
+        database-name: default
+        collection-name: learning_chunks
+        embedding-dimension: 1024
+        index-type: IVF_FLAT
+        metric-type: COSINE
+        initialize-schema: true

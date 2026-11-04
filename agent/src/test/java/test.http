@@ -1,0 +1,6 @@
+POST http://localhost:8082/api/agent/chat
+Content-Type: application/json
+
+{
+  "message": "解释一下一元二次方程的求根公式"
+}

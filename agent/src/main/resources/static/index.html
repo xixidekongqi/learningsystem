@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>多智能体个性化学习系统</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f4f6; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 800px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 20px; display: flex; flex-direction: column; height: 85vh; }
+        .chat-box { flex: 1; overflow-y: auto; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; margin-bottom: 20px; }
+        .message { margin-bottom: 15px; display: flex; flex-direction: column; }
+        .message.user { align-items: flex-end; }
+        .message.bot { align-items: flex-start; }
+        .bubble { max-width: 85%; padding: 12px 16px; border-radius: 12px; line-height: 1.6; font-size: 15px; white-space: pre-wrap; }
+        .user .bubble { background: #3b82f6; color: white; border-bottom-right-radius: 2px; }
+        .bot .bubble { background: #ffffff; color: #1f2937; border: 1px solid #e5e7eb; border-bottom-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .references { margin-top: 8px; font-size: 13px; color: #6b7280; background: #f3f4f6; padding: 8px 12px; border-radius: 6px; border-left: 3px solid #3b82f6; max-width: 80%; }
+        .input-area { display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 14px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 15px; transition: border-color 0.2s; }
+        input[type="text"]:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+        button { padding: 0 24px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 600; transition: background 0.2s; }
+        button:hover { background: #2563eb; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        .loading { font-size: 14px; color: #3b82f6; font-weight: bold; margin-bottom: 10px; display: none; text-align: center; }
+
+        /* 试卷专属样式 */
+        .quiz-question { margin-bottom: 10px; font-weight: bold; color: #111827; }
+        .quiz-options { margin-left: 15px; color: #4b5563; margin-bottom: 5px; }
+        .quiz-answer { margin-top: 5px; font-weight: bold; color: #059669; }
+        .quiz-source { font-size: 12px; color: #9ca3af; font-weight: normal; }
+        .question-block { margin-bottom: 20px; border-bottom: 1px dashed #e5e7eb; padding-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="text-align: center; color: #1f2937; margin-top: 0;">🎓 多智能体个性化学习系统</h2>
+    <div class="chat-box" id="chatBox">
+        <div class="message bot">
+            <div class="bubble">你好！我是你的专属 AI 导师。你可以让我：<br>1. 解释知识点（如：解释求根公式）<br>2. 制定学习计划（如：帮我制定学习计划）<br>3. 出测试题（如：出几道测试题）</div>
+        </div>
+    </div>
+    <div class="loading" id="loading">智能体正在查阅知识库并思考中，请稍候...</div>
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="输入你的问题，按回车发送..." onkeypress="handleKeyPress(event)">
+        <button id="sendBtn" onclick="sendMessage()">发送</button>
+    </div>
+</div>
+
+<script>
+    let chatHistory = "";
+
+    async function sendMessage() {
+        const input = document.getElementById('userInput');
+        const text = input.value.trim();
+        if (!text) return;
+
+        addMessage(text, 'user');
+        input.value = '';
+
+        const loading = document.getElementById('loading');
+        const sendBtn = document.getElementById('sendBtn');
+        loading.style.display = 'block';
+        sendBtn.disabled = true;
+
+        const chatBox = document.getElementById('chatBox');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message bot';
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.innerHTML = `<b>【智能体正在生成...】</b><br>`;
+        msgDiv.appendChild(bubble);
+        chatBox.appendChild(msgDiv);
+
+        try {
+            const response = await fetch('http://localhost:8082/api/agent/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text, history: chatHistory })
+            });
+
+            if (!response.ok) throw new Error('网络请求失败');
+            loading.style.display = 'none';
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+
+            let fullReply = "";
+            let isFirstChunk = true;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                let chunkStr = decoder.decode(value, { stream: true });
+                chunkStr = chunkStr.replace(/data:/g, '').trim();
+
+                if (chunkStr) {
+                    if (isFirstChunk) {
+                        bubble.innerHTML = `<b>【AI 导师】</b><br>`;
+                        isFirstChunk = false;
+                    }
+                    // 流式输出时先保留换行
+                    bubble.innerHTML += chunkStr.replace(/\n/g, '<br>');
+                    fullReply += chunkStr;
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+            }
+
+            // 流式结束后，如果是纯文本试卷，进行终极排版替换
+            if (!fullReply.includes('"questions"')) {
+                let formattedReply = fullReply
+                    // 1. 在题号（如 1. 2.）前面强制换行（排除开头的题号）
+                    .replace(/(?<!^)\s*(\d+\.)/g, '<br><br><strong class="quiz-question">$1</strong>')
+                    // 2. 在选项 A. B. C. D. 前面强制换行（前面加四个空格缩进）
+                    .replace(/\s*([A-D]\.)/g, '<br>&nbsp;&nbsp;&nbsp;&nbsp;$1')
+                    // 3. 给“答案”加粗和上色
+                    .replace(/(答案：.*?)(?=来源|$)/g, '<br><span class="quiz-answer">$1</span>')
+                    // 4. 给“来源”上色
+                    .replace(/(来源：.*?)(?=\n|$)/g, '<span class="quiz-source">$1</span>')
+                    // 5. 把剩下的换行符替换成 HTML 换行
+                    .replace(/\n/g, '<br>');
+
+                bubble.innerHTML = `<b>【AI 导师】</b><br>` + formattedReply;
+            } else {
+                // 兼容 JSON 格式的试卷（备用）
+                try {
+                    let jsonStr = fullReply.replace(/```json/g, '').replace(/```/g, '').trim();
+                    let jsonObj = JSON.parse(jsonStr);
+                    if (jsonObj.questions && jsonObj.questions.length > 0) {
+                        let htmlReply = `<b>【测试评估智能体】</b><br>`;
+                        jsonObj.questions.forEach((q, index) => {
+                            htmlReply += `<div class="question-block">`;
+                            htmlReply += `<div class="quiz-question">${index + 1}. ${q.stem}</div>`;
+                            htmlReply += `<div class="quiz-options">`;
+                            q.options.forEach(opt => { htmlReply += `${opt}<br>`; });
+                            htmlReply += `</div>`;
+                            htmlReply += `<div class="quiz-answer">答案：${q.answer} <span class="quiz-source">[来源: ${q.source}]</span></div>`;
+                            htmlReply += `</div>`;
+                        });
+                        bubble.innerHTML = htmlReply;
+                    }
+                } catch (e) {
+                    console.log("JSON 解析失败，保留原始输出");
+                }
+            }
+
+            chatHistory += `\n用户：${text}\nAI：${fullReply}\n`;
+            if (chatHistory.length > 3000) {
+                chatHistory = chatHistory.substring(chatHistory.length - 3000);
+            }
+
+        } catch (error) {
+            bubble.innerHTML = "抱歉，系统思考超时或出错了。请重试。";
+        } finally {
+            loading.style.display = 'none';
+            sendBtn.disabled = false;
+            input.focus();
+        }
+    }
+
+    function addMessage(text, sender) {
+        const chatBox = document.getElementById('chatBox');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${sender}`;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = text;
+        msgDiv.appendChild(bubble);
+
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter') sendMessage();
+    }
+</script>
+
+</body>
+</html>

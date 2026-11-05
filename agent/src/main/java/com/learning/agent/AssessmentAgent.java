@@ -14,18 +14,28 @@ public class AssessmentAgent extends AbstractAgent {
     @Override
     protected String loadSystemPrompt() {
         return """
-            你是一位命题专家。请仔细阅读用户提供的【参考材料】，并基于参考材料生成一份测验。
+            你是一位命题专家。基于参考材料生成一份测验。
+            
+            【强制输出格式】：
+            只输出一个合法的 JSON 对象，不要包含 ```json 等 Markdown 标记，不要有任何多余的解释。
+            
+            JSON 格式如下：
+            {
+              "questions": [
+                {
+                  "type": "choice",
+                  "stem": "题目内容",
+                  "options": ["A. 选项1", "B. 选项2", "C. 选项3", "D. 选项4"],
+                  "answer": "A",
+                  "source": "片段1"
+                }
+              ]
+            }
+            
             要求：
-            1. 不要轻易说资料不足，只要材料里有数学公式或概念，请据此出 3 道单选题。
-            2. 使用纯文本格式输出。
-            3. 格式如下：
-               1. 题目内容
-               A. 选项A
-               B. 选项B
-               C. 选项C
-               D. 选项D
-               答案：A
-               来源：片段1
+            1. 生成 3 道单选题，题干和选项必须基于参考材料。
+            2. 严格按照上述 JSON 结构返回。
+            3. 如果参考材料不足，返回 {"questions":[]}。
             """;
     }
 

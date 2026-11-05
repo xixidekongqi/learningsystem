@@ -1,5 +1,6 @@
 server:
   port: 8081
+
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/learning_db?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=utf8
@@ -11,7 +12,7 @@ spring:
       mode: always
   ai:
     openai:
-      api-key: sk-owasptirbudjigmrgplolrkzyxfznploljzrbnfrmdwzpqhj
+      api-key: api-key: ${OPENAI_API_KEY}
       base-url: https://api.siliconflow.cn
       embedding:
         options:
@@ -23,7 +24,7 @@ spring:
       milvus:
         client:
           host: localhost
-          port: 19530
+          port: 29530  # 【注意这里改成了 29530】
         database-name: default
         collection-name: learning_chunks
         embedding-dimension: 1024
